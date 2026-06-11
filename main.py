@@ -157,20 +157,60 @@ if df_raw is not None:
             * `-0.3 이하`: 음의 상관관계 (한 통화가 오르면 다른 통화는 떨어짐)
         """)
 
-        # 7. 본문 - [연구 4] 일일 수익률 분포 및 변동성 분석
-        st.header("⚡ 4. 환율 일일 변동률(수익률) 및 위험도 분석")
+       # 7. 본문 - [연구 4] 일일 변동률 추이 및 위험도(변동성) 분석 (개선 버전)
+        st.header("⚡ 4. 환율 일일 변동률 및 통계적 위험도 분석")
+        st.markdown("""
+        환율의 절대적 수치 외에 **전일 대비 일일 변동률(%)**을 분석합니다. 
+        통계학적으로 변동률의 그래프가 0%를 중심으로 중심에 많이 몰려있을수록 안정적인 자산이며, 양옆으로 넓게 퍼질수록 변동성(리스크)이 큰 자산임을 뜻합니다.
+        """)
+        
+        # 일일 변동률 계산 (%) 및 결측치 제거
         return_df = df[currencies].pct_change() * 100
+        return_df_clean = return_df.dropna()
         
-        st.subheader("📅 최근 일일 변동률 추이 (%)")
-        st.bar_chart(return_df.tail(100))
+        # 시각화 편의를 위해 최근 150거래일 데이터 필터링
+        recent_return = return_df_clean.tail(150)
         
-        st.subheader("📊 변동성 지표 요약")
+        # 내부 탭 분할로 가독성 높이기
+        v_tab1, v_tab2 = st.tabs(["📉 시계열 변동률 추이 비교", "📊 변동성 분포(히스토그램) 분석"])
+        
+        with v_tab1:
+            st.subheader("최근 150거래일 일일 변동률 추이 (%)")
+            st.markdown("값이 0%에서 위아래로 크게 튈수록 해당 시점에 외환 시장의 충격이 컸음을 의미합니다.")
+            # 선형 그래프로 변경하여 흐름을 명확하게 파악
+            st.line_chart(recent_return)
+            
+        with v_tab2:
+            st.subheader("통화별 변동률 분포 비교 (Histogram)")
+            st.markdown("각 통화가 어떤 범위의 변동률을 자주 기록했는지 보여주는 통계적 분포도입니다.")
+            
+            # 스트림릿 기본 기능을 활용해 히스토그램 데이터 생성 (구간 30개)
+            hist_data = pd.DataFrame()
+            for curr in currencies:
+                counts, bin_edges = np.histogram(return_df_clean[curr], bins=30)
+                # 각 구간의 중간값을 라벨로 사용하여 데이터프레임화
+                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+                hist_data[f'{curr} 분포'] = pd.Series(counts, index=np.round(bin_centers, 2))
+            
+            st.bar_chart(hist_data)
+            st.caption("💡 **그래프 읽는 법:** 가운데(0%) 영역이 높이 솟구칠수록 평소 안정적인 통화이며, 양끝 변동률 영역에 막대가 많을수록 갑작스러운 폭등락이 잦은 위험 통화입니다.")
+
+        # 변동성 통계 증명 테이블
+        st.subheader("📊 리스크 평가 지표 요약")
         vol_summary = pd.DataFrame({
-            '일일 변동성 (표준편차 %)' : return_df.std(),
-            '최대 상승률 (%)' : return_df.max(),
-            '최대 하락률 (%)' : return_df.min()
+            '일일 변동성 (표준편차 %)' : return_df_clean.std(),
+            '최대 당일 상승률 (%)' : return_df_clean.max(),
+            '최대 당일 하락률 (%)' : return_df_clean.min()
         })
         st.dataframe(vol_summary.style.format("{:.3f}%"))
-
+        
+        # 통계 기반 결론 도출 (자동 데이터 연동 수치 제시)
+        highest_vol_curr = vol_summary['일일 변동성 (표준편차 %)'].idxmax()
+        highest_vol_val = vol_summary['일일 변동성 (표준편차 %)'].max()
+        
+        st.info(f"""
+        📝 **통계적 분석 결론:** 선택하신 기간 동안 대원화 환율 시장에서 가장 위험도(변동성)가 높은 통화는 **{highest_vol_curr}**(표준편차 {highest_vol_val:.3f}%)인 것으로 통계적으로 증명되었습니다. 
+        외환 리스크 관리 시 해당 통화의 노출액에 대한 최우선적인 헤지(Hedge) 전략이 요구됩니다.
+        """)
     except Exception as e:
         st.error(f"데이터 분석 중 오류가 발생했습니다. 파일 형식이 올바른지 확인해 주세요. 오류 내용: {e}")
