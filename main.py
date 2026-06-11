@@ -19,12 +19,11 @@ def load_data(file_source, is_excel=False):
     if is_excel:
         df = pd.read_excel(file_source, skiprows=8, names=['날짜', '원/달러', '원/100엔', '원/위안'])
     else:
-        # 💡 한글 인코딩 오류(UnicodeDecodeError) 해결을 위한 다중 인코딩 시도 로직
+        # 한글 인코딩 오류(UnicodeDecodeError) 해결을 위한 다중 인코딩 시도 로직
         encodings = ['utf-8', 'cp949', 'euc-kr', 'utf-8-sig']
         df = None
         for enc in encodings:
             try:
-                # 업로드된 파일 오브젝트는 읽을 때마다 포인터를 초기화해주어야 안전합니다.
                 if hasattr(file_source, 'seek'):
                     file_source.seek(0)
                 df = pd.read_csv(file_source, skiprows=8, names=['날짜', '원/달러', '원/100엔', '원/위안'], encoding=enc)
@@ -118,8 +117,19 @@ if df_raw is not None:
 
         # 6. 본문 - [연구 3] 통화 간 통계적 상관관계 분석
         st.header("🔗 3. 통화 간 상관관계 및 연동성 검증")
+        st.markdown("피어슨 상관계수(Pearson Correlation Coefficient)를 활용하여 원화 대비 주요국 통화들이 서로 얼마나 같은 방향으로 움직이는지 통계적으로 증명합니다.")
+        
         corr_matrix = df[currencies].corr(method='pearson')
-        st.dataframe(corr_matrix.style.background_gradient(cmap='coolwarm').format("{:.4f}"))
+        # 💡 에러 원인이었던 .style.background_gradient()를 제거하고 안전하게 일반 표로 출력합니다.
+        st.dataframe(corr_matrix.style.format("{:.4f}"))
+        
+        st.markdown("""
+        * **상관계수 해석 기준:**
+            * `+0.7 이상`: 강한 양의 상관관계 (두 통화가 원화 대비 같이 가치가 상승/하락함)
+            * `0.3 ~ 0.7`: 뚜렷한 양의 상관관계
+            * `-0.3 ~ +0.3`: 선형적 연동성 낮음
+            * `-0.3 이하`: 음의 상관관계 (한 통화가 오르면 다른 통화는 떨어짐)
+        """)
 
         # 7. 본문 - [연구 4] 일일 수익률 분포 및 변동성 분석
         st.header("⚡ 4. 환율 일일 변동률(수익률) 및 위험도 분석")
