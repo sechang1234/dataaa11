@@ -104,16 +104,42 @@ if df_raw is not None:
         stats_df.columns = ['관측치 개수', '평균값', '표준편차(변동성)', '최솟값', '최댓값']
         st.dataframe(stats_df.style.format("{:,.2f}"))
 
-        # 5. 본문 - [연구 2] 환율 변동 추이 및 이동평균선 분석
-        st.header("📈 2. 환율 추세 및 이동평균선(MA) 분석")
-        selected_curr = st.selectbox("분석할 통화를 선택하세요:", currencies)
+        # 5. 본문 - [연구 2] 환율 변동 추이 및 이동평균선 분석 (개선 버전)
+        st.header("📈 2. 통화별 환율 추세 및 이동평균선(MA) 분석")
+        st.markdown("각 통화의 실제 환율과 함께 **20일, 60일 이동평균선(Moving Average)**을 개별 시각화하여 단기·장기 추세를 분석합니다.")
         
-        plot_df = pd.DataFrame(index=df.index)
-        plot_df['실제 환율'] = df[selected_curr]
-        plot_df['20일 이동평균'] = df[selected_curr].rolling(window=20).mean()
-        plot_df['60일 이동평균'] = df[selected_curr].rolling(window=60).mean()
+        # 탭(Tab) 기능을 사용하여 달러, 엔, 위안을 깔끔하게 분리
+        tab1, tab2, tab3 = st.tabs(["🇺🇸 원/달러", "🇯🇵 원/100엔", "🇨🇳 원/위안"])
         
-        st.line_chart(plot_df)
+        with tab1:
+            st.subheader("미국 달러 (USD) 추세 분석")
+            df_usd = pd.DataFrame(index=df.index)
+            df_usd['실제 환율'] = df['원/달러']
+            df_usd['20일 이동평균'] = df['원/달러'].rolling(window=20).mean()
+            df_usd['60일 이동평균'] = df['원/달러'].rolling(window=60).mean()
+            st.line_chart(df_usd)
+            
+        with tab2:
+            st.subheader("일본 엔 (JPY 100)")
+            df_jpy = pd.DataFrame(index=df.index)
+            df_jpy['실제 환율'] = df['원/100엔']
+            df_jpy['20일 이동평균'] = df['원/100엔'].rolling(window=20).mean()
+            df_jpy['60일 이동평균'] = df['원/100엔'].rolling(window=60).mean()
+            st.line_chart(df_jpy)
+            
+        with tab3:
+            st.subheader("중국 위안 (CNY)")
+            df_cny = pd.DataFrame(index=df.index)
+            df_cny['실제 환율'] = df['원/위안']
+            df_cny['20일 이동평균'] = df['원/위안'].rolling(window=20).mean()
+            df_cny['60일 이동평균'] = df['원/위안'].rolling(window=60).mean()
+            st.line_chart(df_cny)
+
+        st.markdown("""
+        💡 **보고서용 추세 해석 팁:**
+        * 실제 환율이 이동평균선들보다 전반적으로 **위**에 위치하면 **원화 약세(환율 상승세)** 국면입니다.
+        * 실제 환율이 이동평균선들보다 전반적으로 **아래**에 위치하면 **원화 강세(환율 하락세)** 국면으로 진단할 수 있습니다.
+        """)
 
         # 6. 본문 - [연구 3] 통화 간 통계적 상관관계 분석
         st.header("🔗 3. 통화 간 상관관계 및 연동성 검증")
