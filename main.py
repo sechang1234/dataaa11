@@ -116,6 +116,7 @@ if df_raw is not None:
             df_usd['실제 달러 환율'] = df['원/달러']
             df_usd['20일 이평선'] = df['원/달러'].rolling(window=20).mean()
             df_usd['60일 이평선'] = df['원/달러'].rolling(window=60).mean()
+            # 🎨 블루 계열 색상 지정 (실제값은 진하게, 이평선은 연하게)
             st.line_chart(df_usd, color=["#003f5c", "#2f4b7c", "#a0c4ff"])
             
         with tab2:
@@ -124,6 +125,7 @@ if df_raw is not None:
             df_jpy['실제 엔화 환율'] = df['원/100엔']
             df_jpy['20일 이평선'] = df['원/100엔'].rolling(window=20).mean()
             df_jpy['60일 이평선'] = df['원/100엔'].rolling(window=60).mean()
+            # 🎨 레드/오렌지 계열 색상 지정
             st.line_chart(df_jpy, color=["#f95d6a", "#ff7c43", "#ffa600"])
             
         with tab3:
@@ -132,6 +134,7 @@ if df_raw is not None:
             df_cny['실제 위안 환율'] = df['원/위안']
             df_cny['20일 이평선'] = df['원/위안'].rolling(window=20).mean()
             df_cny['60일 이평선'] = df['원/위안'].rolling(window=60).mean()
+            # 🎨 그린 계열 색상 지정
             st.line_chart(df_cny, color=["#107c41", "#1f9e55", "#7bcd9b"])
 
         # 6. 본문 - [연구 3] 통화 간 통계적 상관관계 분석
@@ -156,41 +159,21 @@ if df_raw is not None:
         
         with v_tab1:
             st.subheader("최근 150거래일 일일 변동률 추이 (%)")
+            # 🎨 선들이 서로 완벽히 찢어져 보이도록 눈에 확 띄는 원색 계열(달러=블루, 엔화=핫핑크, 위안=초록) 지정
             st.line_chart(recent_return, color=["#0055ff", "#ff007f", "#00aa55"])
             
         with v_tab2:
-            st.subheader("📊 통화별 변동률 분포 분석 (Histogram)")
-            st.markdown("가운데(0%) 영역에 막대가 높이 솟구칠수록 평소 안정적인 통화이며, 양끝으로 넓게 퍼질수록 변동성이 큰 위험 통화입니다.")
+            st.subheader("통화별 변동률 분포 비교 (Histogram)")
             
-            # 히스토그램 통계 데이터 선행 계산
             hist_data = pd.DataFrame()
             for curr in currencies:
                 counts, bin_edges = np.histogram(return_df_clean[curr], bins=30)
                 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-                hist_data[f'{curr} 변동 빈도'] = pd.Series(counts, index=np.round(bin_centers, 2))
+                hist_data[f'{curr} 분포'] = pd.Series(counts, index=np.round(bin_centers, 2))
             
-            # 눈이 편안한 하위 탭 분할 시스템
-            sub_tab0, sub_tab1, sub_tab2, sub_tab3 = st.tabs([
-                "🔄 종합 교차 비교", "🇺🇸 미국 달러 분포", "🇯🇵 일본 엔 분포", "🇨🇳 중국 위안 분포"
-            ])
-            
-            with sub_tab0:
-                st.markdown("**💡 종합 비교:** 세 통화의 분포를 동시에 겹쳐봅니다. 어떤 통화의 스펙트럼이 가장 넓은지 확인하세요.")
-                st.bar_chart(hist_data, color=["#1f77b4", "#ff7f0e", "#2ca02c"])
-                
-            with sub_tab1:
-                st.markdown("**🇺🇸 미국 달러 (USD) 일일 변동률 분포**")
-                st.bar_chart(hist_data[[f'원/달러 변동 빈도']], color=["#1f77b4"])
-                
-            with sub_tab2:
-                st.markdown("**🇯🇵 일본 엔 (JPY 100) 일일 변동률 분포**")
-                st.bar_chart(hist_data[[f'원/100엔 변동 빈도']], color=["#ff7f0e"])
-                
-            with sub_tab3:
-                st.markdown("**🇨🇳 중국 위안 (CNY) 일일 변동률 분포**")
-                st.bar_chart(hist_data[[f'원/위안 변동 빈도']], color=["#2ca02c"])
-                
-            st.caption("💡 **통계학적 팁:** 특정 통화의 그래프가 양옆 꼬리(Tail) 방향으로 갈수록 막대가 길고 많다면, 이는 외환 시장에서 극단적인 폭등락 리스크가 자주 발생했음을 의미합니다.")
+            # 🎨 바 차트 히스토그램도 마찬가지로 눈에 띄는 확실한 독립 색상으로 지정
+            st.bar_chart(hist_data, color=["#1f77b4", "#ff7f0e", "#2ca02c"])
+            st.caption("💡 **그래프 읽는 법:** 가운데(0%) 영역이 높이 솟구칠수록 평소 안정적인 통화이며, 양끝 변동률 영역에 막대가 많을수록 갑작스러운 폭등락이 잦은 위험 통화입니다.")
 
         # 변동성 통계 증명 테이블
         st.subheader("📊 리스크 평가 지표 요약")
