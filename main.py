@@ -128,8 +128,3 @@ try:
     })
     st.dataframe(vol_summary.style.format("{:.3f}%"))
     st.markdown("💡 **결론:** '일일 변동성(표준편차)'이 가장 높은 통화가 투자 및 외환 관리 측면에서 가장 위험도가 높은(Volatility) 자산임을 통계적으로 증명합니다.")
-
-except FileNotFoundError:
-    st.error(f"지정된 위치에서 파일을 찾을 수 없습니다. 파일 이름이 **'{FILE_NAME}'** 인지, 스크립트와 같은 폴더에 있는지 확인해주세요.")
-except Exception as e:
-    st.error(f"오류가 발생했습니다: {e}")
