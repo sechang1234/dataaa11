@@ -10,17 +10,30 @@ st.markdown("""
 본 웹앱은 제공된 환율 데이터를 바탕으로 주요국 통화(미국 달러, 일본 엔, 중국 위안)의 대원화 환율 추이를 통계적으로 분석한 탐구 보고서 양식의 대시보드입니다.
 """)
 
-# 2. 데이터 업로드 및 자동 로드 기능 (CSV와 Excel 모두 지원)
+# 2. 데이터 업로드 및 자동 로드 기능 (CSV 인코딩 오류 방지 추가)
 st.sidebar.header("📁 데이터 업로드")
 uploaded_file = st.sidebar.file_uploader("주요국 통화 파일을 업로드하세요 (CSV 또는 엑셀 모두 가능)", type=["csv", "xlsx"])
 
 @st.cache_data
 def load_data(file_source, is_excel=False):
-    # 엑셀 파일일 경우와 CSV 파일일 경우를 나누어 로드
     if is_excel:
         df = pd.read_excel(file_source, skiprows=8, names=['날짜', '원/달러', '원/100엔', '원/위안'])
     else:
-        df = pd.read_csv(file_source, skiprows=8, names=['날짜', '원/달러', '원/100엔', '원/위안'])
+        # 💡 한글 인코딩 오류(UnicodeDecodeError) 해결을 위한 다중 인코딩 시도 로직
+        encodings = ['utf-8', 'cp949', 'euc-kr', 'utf-8-sig']
+        df = None
+        for enc in encodings:
+            try:
+                # 업로드된 파일 오브젝트는 읽을 때마다 포인터를 초기화해주어야 안전합니다.
+                if hasattr(file_source, 'seek'):
+                    file_source.seek(0)
+                df = pd.read_csv(file_source, skiprows=8, names=['날짜', '원/달러', '원/100엔', '원/위안'], encoding=enc)
+                break # 성공하면 루프 탈출
+            except (UnicodeDecodeError, LookupError):
+                continue
+        
+        if df is None:
+            raise ValueError("파일의 인코딩을 지원하지 않습니다. UTF-8 또는 CP949 형식이어야 합니다.")
     
     # 날짜 데이터 변환 및 인덱스 설정
     df['날짜'] = pd.to_datetime(df['날짜'], errors='coerce')
