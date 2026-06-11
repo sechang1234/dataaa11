@@ -195,3 +195,36 @@ if df_raw is not None:
 
     except Exception as e:
         st.error(f"데이터 분석 중 오류가 발생했습니다. 파일 형식이 올바른지 확인해 주세요. 오류 내용: {e}")
+        with v_tab2:
+            st.subheader("📊 통화별 변동률 분포 분석 (Histogram)")
+            st.markdown("가운데(0%) 영역에 막대가 높이 솟구칠수록 평소 안정적인 통화이며, 양끝으로 넓게 퍼질수록 변동성이 큰 위험 통화입니다.")
+            
+            # 1. 히스토그램 통계 데이터 선행 계산 (구간 30개)
+            hist_data = pd.DataFrame()
+            for curr in currencies:
+                counts, bin_edges = np.histogram(return_df_clean[curr], bins=30)
+                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+                hist_data[f'{curr} 변동 빈도'] = pd.Series(counts, index=np.round(bin_centers, 2))
+            
+            # 2. 내부 하위 탭을 만들어 시각적 피로도 분산
+            sub_tab0, sub_tab1, sub_tab2, sub_tab3 = st.tabs([
+                "🔄 종합 교차 비교", "🇺🇸 미국 달러 분포", "🇯🇵 일본 엔 분포", "🇨🇳 중국 위안 분포"
+            ])
+            
+            with sub_tab0:
+                st.markdown("**💡 종합 비교:** 세 통화의 분포를 동시에 겹쳐봅니다. 어떤 통화의 스펙트럼이 가장 넓은지 확인하세요.")
+                st.bar_chart(hist_data, color=["#1f77b4", "#ff7f0e", "#2ca02c"])
+                
+            with sub_tab1:
+                st.markdown("**🇺🇸 미국 달러 (USD) 일일 변동률 분포**")
+                st.bar_chart(hist_data[[f'원/달러 변동 빈도']], color=["#1f77b4"])
+                
+            with sub_tab2:
+                st.markdown("**🇯🇵 일본 엔 (JPY 100) 일일 변동률 분포**")
+                st.bar_chart(hist_data[[f'원/100엔 변동 빈도']], color=["#ff7f0e"])
+                
+            with sub_tab3:
+                st.markdown("**🇨🇳 중국 위안 (CNY) 일일 변동률 분포**")
+                st.bar_chart(hist_data[[f'원/위안 변동 빈도']], color=["#2ca02c"])
+                
+            st.caption("💡 **통계학적 팁:** 특정 통화의 그래프가 양옆 꼬리(Tail) 방향으로 갈수록 막대가 길고 많다면, 이는 외환 시장에서 '뚱뚱한 꼬리(Fat-tail) 현상', 즉 극단적인 폭등락 리스크가 자주 발생했음을 완벽하게 증명합니다.")
