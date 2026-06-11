@@ -104,95 +104,75 @@ if df_raw is not None:
         stats_df.columns = ['관측치 개수', '평균값', '표준편차(변동성)', '최솟값', '최댓값']
         st.dataframe(stats_df.style.format("{:,.2f}"))
 
-        # 5. 본문 - [연구 2] 환율 변동 추이 및 이동평균선 분석 (개선 버전)
+        # 5. 본문 - [연구 2] 환율 변동 추이 및 이동평균선 분석
         st.header("📈 2. 통화별 환율 추세 및 이동평균선(MA) 분석")
         st.markdown("각 통화의 실제 환율과 함께 **20일, 60일 이동평균선(Moving Average)**을 개별 시각화하여 단기·장기 추세를 분석합니다.")
         
-        # 탭(Tab) 기능을 사용하여 달러, 엔, 위안을 깔끔하게 분리
         tab1, tab2, tab3 = st.tabs(["🇺🇸 원/달러", "🇯🇵 원/100엔", "🇨🇳 원/위안"])
         
         with tab1:
             st.subheader("미국 달러 (USD) 추세 분석")
             df_usd = pd.DataFrame(index=df.index)
-            df_usd['실제 환율'] = df['원/달러']
-            df_usd['20일 이동평균'] = df['원/달러'].rolling(window=20).mean()
-            df_usd['60일 이동평균'] = df['원/달러'].rolling(window=60).mean()
-            st.line_chart(df_usd)
+            df_usd['실제 달러 환율'] = df['원/달러']
+            df_usd['20일 이평선'] = df['원/달러'].rolling(window=20).mean()
+            df_usd['60일 이평선'] = df['원/달러'].rolling(window=60).mean()
+            # 🎨 블루 계열 색상 지정 (실제값은 진하게, 이평선은 연하게)
+            st.line_chart(df_usd, color=["#003f5c", "#2f4b7c", "#a0c4ff"])
             
         with tab2:
-            st.subheader("일본 엔 (JPY 100)")
+            st.subheader("일본 엔 (JPY 100) 추세 분석")
             df_jpy = pd.DataFrame(index=df.index)
-            df_jpy['실제 환율'] = df['원/100엔']
-            df_jpy['20일 이동평균'] = df['원/100엔'].rolling(window=20).mean()
-            df_jpy['60일 이동평균'] = df['원/100엔'].rolling(window=60).mean()
-            st.line_chart(df_jpy)
+            df_jpy['실제 엔화 환율'] = df['원/100엔']
+            df_jpy['20일 이평선'] = df['원/100엔'].rolling(window=20).mean()
+            df_jpy['60일 이평선'] = df['원/100엔'].rolling(window=60).mean()
+            # 🎨 레드/오렌지 계열 색상 지정
+            st.line_chart(df_jpy, color=["#f95d6a", "#ff7c43", "#ffa600"])
             
         with tab3:
-            st.subheader("중국 위안 (CNY)")
+            st.subheader("중국 위안 (CNY) 추세 분석")
             df_cny = pd.DataFrame(index=df.index)
-            df_cny['실제 환율'] = df['원/위안']
-            df_cny['20일 이동평균'] = df['원/위안'].rolling(window=20).mean()
-            df_cny['60일 이동평균'] = df['원/위안'].rolling(window=60).mean()
-            st.line_chart(df_cny)
-
-        st.markdown("""
-        💡 **보고서용 추세 해석 팁:**
-        * 실제 환율이 이동평균선들보다 전반적으로 **위**에 위치하면 **원화 약세(환율 상승세)** 국면입니다.
-        * 실제 환율이 이동평균선들보다 전반적으로 **아래**에 위치하면 **원화 강세(환율 하락세)** 국면으로 진단할 수 있습니다.
-        """)
+            df_cny['실제 위안 환율'] = df['원/위안']
+            df_cny['20일 이평선'] = df['원/위안'].rolling(window=20).mean()
+            df_cny['60일 이평선'] = df['원/위안'].rolling(window=60).mean()
+            # 🎨 그린 계열 색상 지정
+            st.line_chart(df_cny, color=["#107c41", "#1f9e55", "#7bcd9b"])
 
         # 6. 본문 - [연구 3] 통화 간 통계적 상관관계 분석
         st.header("🔗 3. 통화 간 상관관계 및 연동성 검증")
         st.markdown("피어슨 상관계수(Pearson Correlation Coefficient)를 활용하여 원화 대비 주요국 통화들이 서로 얼마나 같은 방향으로 움직이는지 통계적으로 증명합니다.")
         
         corr_matrix = df[currencies].corr(method='pearson')
-        # 💡 에러 원인이었던 .style.background_gradient()를 제거하고 안전하게 일반 표로 출력합니다.
         st.dataframe(corr_matrix.style.format("{:.4f}"))
-        
-        st.markdown("""
-        * **상관계수 해석 기준:**
-            * `+0.7 이상`: 강한 양의 상관관계 (두 통화가 원화 대비 같이 가치가 상승/하락함)
-            * `0.3 ~ 0.7`: 뚜렷한 양의 상관관계
-            * `-0.3 ~ +0.3`: 선형적 연동성 낮음
-            * `-0.3 이하`: 음의 상관관계 (한 통화가 오르면 다른 통화는 떨어짐)
-        """)
 
-       # 7. 본문 - [연구 4] 일일 변동률 추이 및 위험도(변동성) 분석 (개선 버전)
+        # 7. 본문 - [연구 4] 일일 수익률 분포 및 변동성 분석
         st.header("⚡ 4. 환율 일일 변동률 및 통계적 위험도 분석")
         st.markdown("""
-        환율의 절대적 수치 외에 **전일 대비 일일 변동률(%)**을 분석합니다. 
+        환율의 전일 대비 일일 변동률(%)을 분석합니다. 
         통계학적으로 변동률의 그래프가 0%를 중심으로 중심에 많이 몰려있을수록 안정적인 자산이며, 양옆으로 넓게 퍼질수록 변동성(리스크)이 큰 자산임을 뜻합니다.
         """)
         
-        # 일일 변동률 계산 (%) 및 결측치 제거
         return_df = df[currencies].pct_change() * 100
         return_df_clean = return_df.dropna()
-        
-        # 시각화 편의를 위해 최근 150거래일 데이터 필터링
         recent_return = return_df_clean.tail(150)
         
-        # 내부 탭 분할로 가독성 높이기
         v_tab1, v_tab2 = st.tabs(["📉 시계열 변동률 추이 비교", "📊 변동성 분포(히스토그램) 분석"])
         
         with v_tab1:
             st.subheader("최근 150거래일 일일 변동률 추이 (%)")
-            st.markdown("값이 0%에서 위아래로 크게 튈수록 해당 시점에 외환 시장의 충격이 컸음을 의미합니다.")
-            # 선형 그래프로 변경하여 흐름을 명확하게 파악
-            st.line_chart(recent_return)
+            # 🎨 선들이 서로 완벽히 찢어져 보이도록 눈에 확 띄는 원색 계열(달러=블루, 엔화=핫핑크, 위안=초록) 지정
+            st.line_chart(recent_return, color=["#0055ff", "#ff007f", "#00aa55"])
             
         with v_tab2:
             st.subheader("통화별 변동률 분포 비교 (Histogram)")
-            st.markdown("각 통화가 어떤 범위의 변동률을 자주 기록했는지 보여주는 통계적 분포도입니다.")
             
-            # 스트림릿 기본 기능을 활용해 히스토그램 데이터 생성 (구간 30개)
             hist_data = pd.DataFrame()
             for curr in currencies:
                 counts, bin_edges = np.histogram(return_df_clean[curr], bins=30)
-                # 각 구간의 중간값을 라벨로 사용하여 데이터프레임화
                 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
                 hist_data[f'{curr} 분포'] = pd.Series(counts, index=np.round(bin_centers, 2))
             
-            st.bar_chart(hist_data)
+            # 🎨 바 차트 히스토그램도 마찬가지로 눈에 띄는 확실한 독립 색상으로 지정
+            st.bar_chart(hist_data, color=["#1f77b4", "#ff7f0e", "#2ca02c"])
             st.caption("💡 **그래프 읽는 법:** 가운데(0%) 영역이 높이 솟구칠수록 평소 안정적인 통화이며, 양끝 변동률 영역에 막대가 많을수록 갑작스러운 폭등락이 잦은 위험 통화입니다.")
 
         # 변동성 통계 증명 테이블
@@ -212,5 +192,6 @@ if df_raw is not None:
         📝 **통계적 분석 결론:** 선택하신 기간 동안 대원화 환율 시장에서 가장 위험도(변동성)가 높은 통화는 **{highest_vol_curr}**(표준편차 {highest_vol_val:.3f}%)인 것으로 통계적으로 증명되었습니다. 
         외환 리스크 관리 시 해당 통화의 노출액에 대한 최우선적인 헤지(Hedge) 전략이 요구됩니다.
         """)
+
     except Exception as e:
         st.error(f"데이터 분석 중 오류가 발생했습니다. 파일 형식이 올바른지 확인해 주세요. 오류 내용: {e}")
