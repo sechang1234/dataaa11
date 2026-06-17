@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import os
 
 # 1. 웹앱 제목 및 서론
 st.set_page_config(page_title="원화 환율 변동 추이 분석", layout="wide")
@@ -9,42 +10,49 @@ st.markdown("""
 본 웹앱은 제공된 환율 데이터를 바탕으로 주요국 통화(미국 달러, 일본 엔, 중국 위안)의 대원화 환율 추이를 통계적으로 분석한 탐구 보고서 양식의 대시보드입니다.
 """)
 
-# 💡 [핵심 수정] 사용자가 파일 업로드를 안 해도 깃허브에서 직접 가져오도록 설정
-# 본인의 깃허브 ID와 저장소명(Repository 이름)으로 주소를 바꾸면 영구히 작동합니다.
-# 예시: "https://raw.githubusercontent.com/깃허브ID/저장소명/main/주요국%20통화의%20대원화%20환율.xlsx%20-%20Sheet1.csv"
-DATA_URL = "https://raw.githubusercontent.com/dataaa11/dataaa11/main/%EC%A3%BC%EC%9A%94%EA%B5%AD%20%ED%86%B5%ED%99%94%EC%9D%98%20%EB%8C%80%EC%9B%90%ED%99%94%20%ED%99%98%EC%9C%A8.xlsx%20-%20Sheet1.csv"
-
+# 2. 데이터 자동 로드 기능 (사용자 업로드 창은 제거하여 켜자마자 바로 분석 시작)
 @st.cache_data
-def load_data_from_url(url):
-    # 한글 인코딩 오류 방지
+def load_data_from_file(file_path):
+    # 한글 인코딩 오류(UnicodeDecodeError) 해결을 위한 다중 인코딩 시도 로직
     encodings = ['utf-8', 'cp949', 'euc-kr', 'utf-8-sig']
     df = None
     for enc in encodings:
         try:
-            df = pd.read_csv(url, skiprows=8, names=['날짜', '원/달러', '원/100엔', '원/위안'], encoding=enc)
-            break
+            # 상단 메타데이터(8줄)를 제외하고 컬럼명을 매칭하여 로드
+            df = pd.read_csv(file_path, skiprows=8, names=['날짜', '원/달러', '원/100엔', '원/위안'], encoding=enc)
+            break # 성공하면 루프 탈출
         except:
             continue
     
     if df is None:
-        raise ValueError("데이터 로드 실패")
-        
+        raise ValueError("파일의 인코딩을 지원하지 않습니다. UTF-8 또는 CP949 형식이어야 합니다.")
+    
+    # 날짜 데이터 변환 및 정렬
     df['날짜'] = pd.to_datetime(df['날짜'], errors='coerce')
     df = df.dropna(subset=['날짜']).sort_values('날짜')
+    
+    # 숫자형 데이터 변환
     for col in ['원/달러', '원/100엔', '원/위안']:
         df[col] = pd.to_numeric(df[col], errors='coerce')
+        
     return df
 
-# 사용자가 아무것도 안 해도 링크에서 자동으로 가져옴
-try:
-    df_raw = load_data_from_url(DATA_URL)
-except Exception as e:
-    st.error(f"데이터를 불러오지 못했습니다. URL주소나 깃허브에 파일이 있는지 확인해주세요. 에러: {e}")
-    df_raw = None
+# 💡 [핵심 수정] 사용자님의 실제 파일 이름으로 정확하게 변경했습니다.
+FILE_NAME = "주요국 통화의 대원화 환율.csv"
 
-# 데이터가 로드되면 바로 화면 출력
+df_raw = None
+
+# 서버 내에 파일이 존재하는지 확인 후 자동 로드
+if os.path.exists(FILE_NAME):
+    try:
+        df_raw = load_data_from_file(FILE_NAME)
+    except Exception as e:
+        st.error(f"데이터 파일 전처리 중 오류가 발생했습니다: {e}")
+else:
+    st.error(f"⚠️ 깃허브 저장소에 '{FILE_NAME}' 파일이 존재하지 않습니다. 메인 화면(main.py와 같은 위치)에 파일을 올렸는지 확인해 주세요.")
+
+# 데이터가 성공적으로 로드된 경우에만 분석 코드가 실행됩니다.
 if df_raw is not None:
-    # --- 이 아래부터는 기존 분석 코드와 완전히 동일합니다 ---
     try:
         # 3. 사이드바 - 분석 기간 및 통화 선택
         st.sidebar.header("🔍 분석 설정")
@@ -56,9 +64,10 @@ if df_raw is not None:
             "분석 기간 선택",
             min_value=min_date,
             max_value=max_date,
-            value=(max_date - pd.Timedelta(days=365*2), max_date)
+            value=(max_date - pd.Timedelta(days=365*2), max_date) # 기본값 최근 2년
         )
         
+        # 필터링된 데이터 생성
         df = df_raw[(df_raw['날짜'] >= start_date) & (df_raw['날짜'] <= end_date)].copy()
         df.set_index('날짜', inplace=True)
 
@@ -85,6 +94,8 @@ if df_raw is not None:
 
         # 5. 본문 - [연구 2] 환율 변동 추이 및 이동평균선 분석
         st.header("📈 2. 통화별 환율 추세 및 이동평균선(MA) 분석")
+        st.markdown("각 통화의 실제 환율과 함께 **20일, 60일 이동평균선(Moving Average)**을 개별 시각화하여 단기·장기 추세를 분석합니다.")
+        
         tab1, tab2, tab3 = st.tabs(["🇺🇸 원/달러", "🇯🇵 원/100엔", "🇨🇳 원/위안"])
         
         with tab1:
@@ -113,11 +124,17 @@ if df_raw is not None:
 
         # 6. 본문 - [연구 3] 통화 간 통계적 상관관계 분석
         st.header("🔗 3. 통화 간 상관관계 및 연동성 검증")
+        st.markdown("피어슨 상관계수(Pearson Correlation Coefficient)를 활용하여 원화 대비 주요국 통화들이 서로 얼마나 같은 방향으로 움직이는지 통계적으로 증명합니다.")
+        
         corr_matrix = df[currencies].corr(method='pearson')
         st.dataframe(corr_matrix.style.format("{:.4f}"))
 
         # 7. 본문 - [연구 4] 일일 수익률 분포 및 변동성 분석
         st.header("⚡ 4. 환율 일일 변동률 및 통계적 위험도 분석")
+        st.markdown("""
+        환율의 전일 대비 일일 변동률(%)을 분석합니다. 
+        """)
+        
         return_df = df[currencies].pct_change() * 100
         return_df_clean = return_df.dropna()
         recent_return = return_df_clean.tail(150)
@@ -130,12 +147,16 @@ if df_raw is not None:
             
         with v_tab2:
             st.subheader("📊 통화별 변동률 분포 분석 (Histogram)")
+            st.markdown("가운데(0%) 영역에 막대가 높이 솟구칠수록 평소 안정적인 통화이며, 양끝으로 넓게 퍼질수록 변동성이 큰 위험 통화입니다.")
+            
+            # 히스토그램 통계 데이터 선행 계산
             hist_data = pd.DataFrame()
             for curr in currencies:
                 counts, bin_edges = np.histogram(return_df_clean[curr], bins=30)
                 bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
                 hist_data[f'{curr} 변동 빈도'] = pd.Series(counts, index=np.round(bin_centers, 2))
             
+            # 눈이 편안한 하위 탭 분할 시스템
             sub_tab0, sub_tab1, sub_tab2, sub_tab3 = st.tabs([
                 "🔄 종합 교차 비교", "🇺🇸 미국 달러 분포", "🇯🇵 일본 엔 분포", "🇨🇳 중국 위안 분포"
             ])
@@ -149,6 +170,7 @@ if df_raw is not None:
             with sub_tab3:
                 st.bar_chart(hist_data[[f'원/위안 변동 빈도']], color=["#2ca02c"])
 
+        # 변동성 통계 증명 테이블
         st.subheader("📊 리스크 평가 지표 요약")
         vol_summary = pd.DataFrame({
             '일일 변동성 (표준편차 %)' : return_df_clean.std(),
@@ -157,6 +179,7 @@ if df_raw is not None:
         })
         st.dataframe(vol_summary.style.format("{:.3f}%"))
         
+        # 통계 기반 결론 도출 (자동 데이터 연동 수치 제시)
         highest_vol_curr = vol_summary['일일 변동성 (표준편차 %)'].idxmax()
         highest_vol_val = vol_summary['일일 변동성 (표준편차 %)'].max()
         
@@ -165,4 +188,4 @@ if df_raw is not None:
         """)
 
     except Exception as e:
-        st.error(f"오류 발생: {e}")
+        st.error(f"데이터 분석 중 오류가 발생했습니다. 오류 내용: {e}")
