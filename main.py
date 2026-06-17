@@ -3,189 +3,188 @@ import pandas as pd
 import numpy as np
 import os
 
-# 1. 웹앱 제목 및 서론
+# 1. 웹앱 전체 환경 설정
 st.set_page_config(page_title="원화 환율 변동 추이 분석", layout="wide")
-st.title("📈 주요국 통화의 대원화 환율 변동 추이 및 통계적 분석")
-st.markdown("""
-본 웹앱은 제공된 환율 데이터를 바탕으로 주요국 통화(미국 달러, 일본 엔, 중국 위안)의 대원화 환율 추이를 통계적으로 분석한 탐구 보고서 양식의 대시보드입니다.
-""")
 
-# 2. 데이터 자동 로드 기능 (사용자 업로드 창은 제거하여 켜자마자 바로 분석 시작)
+# 2. 데이터 자동 로드 기능 (캐싱 적용)
 @st.cache_data
 def load_data_from_file(file_path):
-    # 한글 인코딩 오류(UnicodeDecodeError) 해결을 위한 다중 인코딩 시도 로직
     encodings = ['utf-8', 'cp949', 'euc-kr', 'utf-8-sig']
     df = None
     for enc in encodings:
         try:
-            # 상단 메타데이터(8줄)를 제외하고 컬럼명을 매칭하여 로드
             df = pd.read_csv(file_path, skiprows=8, names=['날짜', '원/달러', '원/100엔', '원/위안'], encoding=enc)
-            break # 성공하면 루프 탈출
+            break
         except:
             continue
     
     if df is None:
-        raise ValueError("파일의 인코딩을 지원하지 않습니다. UTF-8 또는 CP949 형식이어야 합니다.")
+        raise ValueError("파일의 인코딩을 지원하지 않습니다.")
     
-    # 날짜 데이터 변환 및 정렬
     df['날짜'] = pd.to_datetime(df['날짜'], errors='coerce')
     df = df.dropna(subset=['날짜']).sort_values('날짜')
     
-    # 숫자형 데이터 변환
     for col in ['원/달러', '원/100엔', '원/위안']:
         df[col] = pd.to_numeric(df[col], errors='coerce')
         
     return df
 
-# 💡 [핵심 수정] 사용자님의 실제 파일 이름으로 정확하게 변경했습니다.
 FILE_NAME = "주요국 통화의 대원화 환율.csv"
-
 df_raw = None
 
-# 서버 내에 파일이 존재하는지 확인 후 자동 로드
 if os.path.exists(FILE_NAME):
     try:
         df_raw = load_data_from_file(FILE_NAME)
     except Exception as e:
-        st.error(f"데이터 파일 전처리 중 오류가 발생했습니다: {e}")
+        st.error(f"데이터 파일 전처리 중 오류: {e}")
 else:
-    st.error(f"⚠️ 깃허브 저장소에 '{FILE_NAME}' 파일이 존재하지 않습니다. 메인 화면(main.py와 같은 위치)에 파일을 올렸는지 확인해 주세요.")
+    st.error(f"⚠️ 깃허브 저장소에 '{FILE_NAME}' 파일이 존재하지 않습니다.")
 
-# 데이터가 성공적으로 로드된 경우에만 분석 코드가 실행됩니다.
+# 데이터가 성공적으로 로드된 경우에만 대시보드 실행
 if df_raw is not None:
-    try:
-        # 3. 사이드바 - 분석 기간 및 통화 선택
-        st.sidebar.header("🔍 분석 설정")
+    
+    # 3. 사이드바 내비게이션 (멀티 페이지 메뉴)
+    st.sidebar.header("🗺️ 페이지 이동")
+    page = st.sidebar.radio(
+        "분석할 국가를 선택하세요",
+        ["🏠 홈 (종합 분석)", "🇺🇸 미국 (원/달러)", "🇯🇵 일본 (원/100엔)", "🇨🇳 중국 (원/위안)"]
+    )
+    
+    # 4. 사이드바 - 분석 기간 공통 설정
+    st.sidebar.header("🔍 분석 설정")
+    min_date = df_raw['날짜'].min().to_pydatetime()
+    max_date = df_raw['날짜'].max().to_pydatetime()
+    
+    start_date, end_date = st.sidebar.slider(
+        "분석 기간 선택",
+        min_value=min_date,
+        max_value=max_date,
+        value=(max_date - pd.Timedelta(days=365*2), max_date)
+    )
+    
+    # 기간 필터링 데이터 생성
+    df = df_raw[(df_raw['날짜'] >= start_date) & (df_raw['날짜'] <= end_date)].copy()
+    df.set_index('날짜', inplace=True)
+    currencies = ['원/달러', '원/100엔', '원/위안']
+    
+    # 변동률 및 히스토그램 데이터 선행 계산
+    return_df = df[currencies].pct_change() * 100
+    return_df_clean = return_df.dropna()
+    
+    # ==========================================
+    # PAGE 1: 홈 (종합 분석)
+    # ==========================================
+    if page == "🏠 홈 (종합 분석)":
+        st.title("📈 주요국 통화의 대원화 환율 변동 추이 및 통계적 분석")
+        st.markdown("본 대시보드는 미국 달러, 일본 엔, 중국 위안화의 대원화 환율 데이터를 기반으로 한 통계 탐구 보고서입니다.")
         
-        min_date = df_raw['날짜'].min().to_pydatetime()
-        max_date = df_raw['날짜'].max().to_pydatetime()
-        
-        start_date, end_date = st.sidebar.slider(
-            "분석 기간 선택",
-            min_value=min_date,
-            max_value=max_date,
-            value=(max_date - pd.Timedelta(days=365*2), max_date) # 기본값 최근 2년
-        )
-        
-        # 필터링된 데이터 생성
-        df = df_raw[(df_raw['날짜'] >= start_date) & (df_raw['날짜'] <= end_date)].copy()
-        df.set_index('날짜', inplace=True)
-
-        # 4. 본문 - [연구 1] 데이터 개요 및 기술 통계
-        st.header("📋 1. 데이터 개요 및 기술 통계 분석")
-        st.markdown("선택한 기간 동안의 기초 통계량을 통해 각 통화의 평균적인 수준과 분포의 흩어진 정도를 파악합니다.")
-        
+        # 최근 환율 모니터링
+        st.header("📋 1. 최근 환율 및 기술 통계 개요")
         cols = st.columns(3)
-        currencies = ['원/달러', '원/100엔', '원/위안']
-        
         for i, curr in enumerate(currencies):
             with cols[i]:
                 valid_series = df[curr].dropna()
                 if not valid_series.empty:
-                    latest_val = valid_series.iloc[-1]
-                    st.metric(label=f"최근 {curr}", value=f"{latest_val:,.2f} 원")
-                else:
-                    st.metric(label=f"최근 {curr}", value="데이터 없음")
-
-        st.subheader("📊 주요 통계 지표")
+                    st.metric(label=f"최근 {curr}", value=f"{valid_series.iloc[-1]:,.2f} 원")
+                    
+        # 통계 지표 테이블
         stats_df = df.describe().T[['count', 'mean', 'std', 'min', 'max']]
         stats_df.columns = ['관측치 개수', '평균값', '표준편차(변동성)', '최솟값', '최댓값']
         st.dataframe(stats_df.style.format("{:,.2f}"))
-
-        # 5. 본문 - [연구 2] 환율 변동 추이 및 이동평균선 분석
-        st.header("📈 2. 통화별 환율 추세 및 이동평균선(MA) 분석")
-        st.markdown("각 통화의 실제 환율과 함께 **20일, 60일 이동평균선(Moving Average)**을 개별 시각화하여 단기·장기 추세를 분석합니다.")
         
-        tab1, tab2, tab3 = st.tabs(["🇺🇸 원/달러", "🇯🇵 원/100엔", "🇨🇳 원/위안"])
-        
-        with tab1:
-            st.subheader("미국 달러 (USD) 추세 분석")
-            df_usd = pd.DataFrame(index=df.index)
-            df_usd['실제 달러 환율'] = df['원/달러']
-            df_usd['20일 이평선'] = df['원/달러'].rolling(window=20).mean()
-            df_usd['60일 이평선'] = df['원/달러'].rolling(window=60).mean()
-            st.line_chart(df_usd, color=["#003f5c", "#2f4b7c", "#a0c4ff"])
-            
-        with tab2:
-            st.subheader("일본 엔 (JPY 100) 추세 분석")
-            df_jpy = pd.DataFrame(index=df.index)
-            df_jpy['실제 엔화 환율'] = df['원/100엔']
-            df_jpy['20일 이평선'] = df['원/100엔'].rolling(window=20).mean()
-            df_jpy['60일 이평선'] = df['원/100엔'].rolling(window=60).mean()
-            st.line_chart(df_jpy, color=["#f95d6a", "#ff7c43", "#ffa600"])
-            
-        with tab3:
-            st.subheader("중국 위안 (CNY) 추세 분석")
-            df_cny = pd.DataFrame(index=df.index)
-            df_cny['실제 위안 환율'] = df['원/위안']
-            df_cny['20일 이평선'] = df['원/위안'].rolling(window=20).mean()
-            df_cny['60일 이평선'] = df['원/위안'].rolling(window=60).mean()
-            st.line_chart(df_cny, color=["#107c41", "#1f9e55", "#7bcd9b"])
-
-        # 6. 본문 - [연구 3] 통화 간 통계적 상관관계 분석
-        st.header("🔗 3. 통화 간 상관관계 및 연동성 검증")
-        st.markdown("피어슨 상관계수(Pearson Correlation Coefficient)를 활용하여 원화 대비 주요국 통화들이 서로 얼마나 같은 방향으로 움직이는지 통계적으로 증명합니다.")
-        
+        # 상관관계 분석
+        st.header("🔗 2. 통화 간 통계적 상관관계 검증")
         corr_matrix = df[currencies].corr(method='pearson')
         st.dataframe(corr_matrix.style.format("{:.4f}"))
-
-        # 7. 본문 - [연구 4] 일일 수익률 분포 및 변동성 분석
-        st.header("⚡ 4. 환율 일일 변동률 및 통계적 위험도 분석")
-        st.markdown("""
-        환율의 전일 대비 일일 변동률(%)을 분석합니다. 
-        """)
         
-        return_df = df[currencies].pct_change() * 100
-        return_df_clean = return_df.dropna()
+        # 종합 변동성 비교
+        st.header("⚡ 3. 일일 변동률 종합 리스크 비교")
         recent_return = return_df_clean.tail(150)
+        st.line_chart(recent_return, color=["#0055ff", "#ff007f", "#00aa55"])
         
-        v_tab1, v_tab2 = st.tabs(["📉 시계열 변동률 추이 비교", "📊 변동성 분포(히스토그램) 분석"])
-        
-        with v_tab1:
-            st.subheader("최근 150거래일 일일 변동률 추이 (%)")
-            st.line_chart(recent_return, color=["#0055ff", "#ff007f", "#00aa55"])
-            
-        with v_tab2:
-            st.subheader("📊 통화별 변동률 분포 분석 (Histogram)")
-            st.markdown("가운데(0%) 영역에 막대가 높이 솟구칠수록 평소 안정적인 통화이며, 양끝으로 넓게 퍼질수록 변동성이 큰 위험 통화입니다.")
-            
-            # 히스토그램 통계 데이터 선행 계산
-            hist_data = pd.DataFrame()
-            for curr in currencies:
-                counts, bin_edges = np.histogram(return_df_clean[curr], bins=30)
-                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-                hist_data[f'{curr} 변동 빈도'] = pd.Series(counts, index=np.round(bin_centers, 2))
-            
-            # 눈이 편안한 하위 탭 분할 시스템
-            sub_tab0, sub_tab1, sub_tab2, sub_tab3 = st.tabs([
-                "🔄 종합 교차 비교", "🇺🇸 미국 달러 분포", "🇯🇵 일본 엔 분포", "🇨🇳 중국 위안 분포"
-            ])
-            
-            with sub_tab0:
-                st.bar_chart(hist_data, color=["#1f77b4", "#ff7f0e", "#2ca02c"])
-            with sub_tab1:
-                st.bar_chart(hist_data[[f'원/달러 변동 빈도']], color=["#1f77b4"])
-            with sub_tab2:
-                st.bar_chart(hist_data[[f'원/100엔 변동 빈도']], color=["#ff7f0e"])
-            with sub_tab3:
-                st.bar_chart(hist_data[[f'원/위안 변동 빈도']], color=["#2ca02c"])
-
-        # 변동성 통계 증명 테이블
-        st.subheader("📊 리스크 평가 지표 요약")
+        # 변동성 요약
         vol_summary = pd.DataFrame({
             '일일 변동성 (표준편차 %)' : return_df_clean.std(),
             '최대 당일 상승률 (%)' : return_df_clean.max(),
             '최대 당일 하락률 (%)' : return_df_clean.min()
         })
-        st.dataframe(vol_summary.style.format("{:.3f}%"))
-        
-        # 통계 기반 결론 도출 (자동 데이터 연동 수치 제시)
         highest_vol_curr = vol_summary['일일 변동성 (표준편차 %)'].idxmax()
-        highest_vol_val = vol_summary['일일 변동성 (표준편차 %)'].max()
-        
-        st.info(f"""
-        📝 **통계적 분석 결론:** 선택하신 기간 동안 대원화 환율 시장에서 가장 위험도(변동성)가 높은 통화는 **{highest_vol_curr}**(표준편차 {highest_vol_val:.3f}%)인 것으로 통계적으로 증명되었습니다. 
-        """)
+        st.info(f"📝 **통계적 결론:** 현재 선택 기간 외환 시장에서 리스크(변동성)가 가장 높은 통화는 **{highest_vol_curr}**입니다.")
 
-    except Exception as e:
-        st.error(f"데이터 분석 중 오류가 발생했습니다. 오류 내용: {e}")
+    # ==========================================
+    # PAGE 2: 미국 달러
+    # ==========================================
+    elif page == "🇺🇸 미국 (원/달러)":
+        st.title("🇺🇸 미국 달러 (USD) 대원화 환율 심층 분석")
+        
+        # 1. 추세 분석 그래프
+        st.header("📈 환율 추세 및 이동평균선(MA) 분석")
+        df_usd = pd.DataFrame(index=df.index)
+        df_usd['실제 달러 환율'] = df['원/달러']
+        df_usd['20일 이평선'] = df['원/달러'].rolling(window=20).mean()
+        df_usd['60일 이평선'] = df['원/달러'].rolling(window=60).mean()
+        st.line_chart(df_usd, color=["#003f5c", "#2f4b7c", "#a0c4ff"])
+        
+        # 2. 리스크/히스토그램 분석
+        st.header("📊 일일 변동률 분포 (Histogram)")
+        counts, bin_edges = np.histogram(return_df_clean['원/달러'], bins=30)
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+        hist_usd = pd.DataFrame({'원/달러 변동 빈도': counts}, index=np.round(bin_centers, 2))
+        st.bar_chart(hist_usd, color=["#1f77b4"])
+        
+        # 3. 통계 지표 요약
+        st.header("📋 달러 리스크 통계 지표")
+        st.write(f"- **선택 기간 평균 환율:** {df['원/달러'].mean():,.2f} 원")
+        st.write(f"- **일일 변동성 (표준편차):** {return_df_clean['원/달러'].std():.3f}%")
+
+    # ==========================================
+    # PAGE 3: 일본 엔화
+    # ==========================================
+    elif page == "🇯🇵 일본 (원/100엔)":
+        st.title("🇯🇵 일본 엔 (JPY 100) 대원화 환율 심층 분석")
+        
+        # 1. 추세 분석 그래프
+        st.header("📈 환율 추세 및 이동평균선(MA) 분석")
+        df_jpy = pd.DataFrame(index=df.index)
+        df_jpy['실제 엔화 환율'] = df['원/100엔']
+        df_jpy['20일 이평선'] = df['원/100엔'].rolling(window=20).mean()
+        df_jpy['60일 이평선'] = df['원/100엔'].rolling(window=60).mean()
+        st.line_chart(df_jpy, color=["#f95d6a", "#ff7c43", "#ffa600"])
+        
+        # 2. 리스크/히스토그램 분석
+        st.header("📊 일일 변동률 분포 (Histogram)")
+        counts, bin_edges = np.histogram(return_df_clean['원/100엔'], bins=30)
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+        hist_jpy = pd.DataFrame({'원/100엔 변동 빈도': counts}, index=np.round(bin_centers, 2))
+        st.bar_chart(hist_jpy, color=["#ff7f0e"])
+        
+        # 3. 통계 지표 요약
+        st.header("📋 엔화 리스크 통계 지표")
+        st.write(f"- **선택 기간 평균 환율:** {df['원/100엔'].mean():,.2f} 원")
+        st.write(f"- **일일 변동성 (표준편차):** {return_df_clean['원/100엔'].std():.3f}%")
+
+    # ==========================================
+    # PAGE 4: 중국 위안화
+    # ==========================================
+    elif page == "🇨🇳 중국 (원/위안)":
+        st.title("🇨🇳 중국 위안 (CNY) 대원화 환율 심층 분석")
+        
+        # 1. 추세 분석 그래프
+        st.header("📈 환율 추세 및 이동평균선(MA) 분석")
+        df_cny = pd.DataFrame(index=df.index)
+        df_cny['실제 위안 환율'] = df['원/위안']
+        df_cny['20일 이평선'] = df['원/위안'].rolling(window=20).mean()
+        df_cny['60일 이평선'] = df['원/위안'].rolling(window=60).mean()
+        st.line_chart(df_cny, color=["#107c41", "#1f9e55", "#7bcd9b"])
+        
+        # 2. 리스크/히스토그램 분석
+        st.header("📊 일일 변동률 분포 (Histogram)")
+        counts, bin_edges = np.histogram(return_df_clean['원/위안'], bins=30)
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+        hist_cny = pd.DataFrame({'원/위안 변동 빈도': counts}, index=np.round(bin_centers, 2))
+        st.bar_chart(hist_cny, color=["#2ca02c"])
+        
+        # 3. 통계 지표 요약
+        st.header("📋 위안화 리스크 통계 지표")
+        st.write(f"- **선택 기간 평균 환율:** {df['원/위안'].mean():,.2f} 원")
+        st.write(f"- **일일 변동성 (표준편차):** {return_df_clean['원/위안'].std():.3f}%")
