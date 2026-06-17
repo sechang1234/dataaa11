@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 # 1. 웹앱 전체 환경 설정
-st.set_page_config(page_title="원화 환율 변동 추이 분석", layout="wide")
+st.set_page_config(page_title="환율의 변화와 예측", layout="wide")
 
 # 2. 데이터 자동 로드 기능 (캐싱 적용)
 @st.cache_data
@@ -47,7 +47,7 @@ if df_raw is not None:
     st.sidebar.header("🗺️ 페이지 이동")
     page = st.sidebar.radio(
         "분석 및 탐구 단계를 선택하세요",
-        ["🏠 홈 (종합 분석)", "🔮 2030년 장기 환율 예측", "🇺🇸 미국 (원/달러)", "🇯🇵 일본 (원/100엔)", "🇨🇳 중국 (원/위안)"]
+        ["🏠 홈 (환율 변화 개요)", "🔮 2030년 장기 환율 예측", "🇺🇸 미국 (원/달러)", "🇯🇵 일본 (원/100엔)", "🇨🇳 중국 (원/위안)"]
     )
     
     # 4. 사이드바 - 분석 기간 공통 설정
@@ -72,13 +72,16 @@ if df_raw is not None:
     return_df_clean = return_df.dropna()
     
     # ==========================================
-    # PAGE 1: 홈 (종합 분석)
+    # PAGE 1: 홈 (환율 변화 개요)
     # ==========================================
-    if page == "🏠 홈 (종합 분석)":
-        st.title("📈 주요국 통화의 대원화 환율 변동 추이 및 통계적 분석")
-        st.markdown("본 대시보드는 미국 달러, 일본 엔, 중국 위안화의 대원화 환율 데이터를 기반으로 한 통계 탐구 보고서입니다.")
+    if page == "🏠 홈 (환율 변화 개요)":
+        st.title("📈 환율의 변화와 예측")
+        st.markdown("""
+        본 대시보드는 글로벌 금융 시장의 중심이 되는 주요국 통화(미국 달러, 일본 엔, 중국 위안)의 대원화 환율 데이터를 기반으로 삼고 있습니다.
+        과거부터 축적된 **환율의 역사적 변화 흐름을 추적**하고, 이를 통계적 모형으로 정량화하여 **미래의 변동 범위를 시뮬레이션**하는 탐구 목적의 웹 애플리케이션입니다.
+        """)
         
-        st.header("📋 1. 최근 환율 및 기술 통계 개요")
+        st.header("📋 1. 최근 환율 변화 지표 및 통계 개요")
         cols = st.columns(3)
         for i, curr in enumerate(currencies):
             with cols[i]:
@@ -90,22 +93,21 @@ if df_raw is not None:
         stats_df.columns = ['관측치 개수', '평균값', '표준편차(변동성)', '최솟값', '최댓값']
         st.dataframe(stats_df.style.format("{:,.2f}"))
         
-        st.header("🔗 2. 통화 간 통계적 상관관계 검증")
+        st.header("🔗 2. 통화별 환율 변화의 연동성(상관관계) 검증")
         corr_matrix = df[currencies].corr(method='pearson')
         st.dataframe(corr_matrix.style.format("{:.4f}"))
         
-        st.header("⚡ 3. 일일 변동률 종합 리스크 비교")
+        st.header("⚡ 3. 일일 환율 변화율(수익률) 리스크 비교")
         st.line_chart(return_df_clean.tail(150) * 100, color=["#0055ff", "#ff007f", "#00aa55"])
 
     # ==========================================
-    # 🔮 NEW PAGE: 2030년 장기 환율 예측 (GBM 모델)
+    # PAGE 2: 2030년 장기 환율 예측 (GBM 모델)
     # ==========================================
     elif page == "🔮 2030년 장기 환율 예측":
-        st.title("🔮 환율은 점점 오르고 있을까? 2030년 장기 시뮬레이션")
+        st.title("🔮 환율의 변화 추세에 기반한 2030년 장기 예측")
         st.markdown("""
-        수년 이상의 장기 예측에서는 단순한 직선 추세선을 쓰면 비현실적인 수치가 나옵니다. 
-        따라서 금융공학에서 자산 가격 예측에 활용하는 **기하 브라운 운동(Geometric Brownian Motion, GBM)** 모델을 적용합니다. 
-        이 모델은 과거 데이터의 **평균 상승률(Drift)**과 **시장 위험도(Volatility)**를 추출하여, 변동성을 포함한 2030년까지의 미래 시나리오를 무작위로 수백 번 계산합니다.
+        시간이 흐름에 따라 환율은 끊임없이 변화합니다. 본 페이지에서는 과거 환율 변화의 무작위성과 고유한 추세를 수학적으로 공식화한 **기하 브라운 운동(Geometric Brownian Motion, GBM)** 모델을 적용합니다. 
+        이를 통해 단순한 일직선 연장이 아닌, 시장 리스크가 누적되는 환경 속에서 **2030년 말까지 환율이 변화해 나갈 확률적 범위**를 시뮬레이션합니다.
         """)
         
         selected_curr = st.selectbox("시뮬레이션할 통화를 선택하세요", currencies)
@@ -115,7 +117,7 @@ if df_raw is not None:
         current_val = y_data.iloc[-1]
         last_date = y_data.index[-1]
         
-        # 2030년 12월 31일까지 남은 거래일 계산 (1년 대략 250거래일 가정)
+        # 2030년 12월 31일까지 남은 거래일 계산
         target_date = pd.to_datetime("2030-12-31")
         days_to_predict = int(np.busday_count(last_date.date(), target_date.date()))
         
@@ -136,7 +138,6 @@ if df_raw is not None:
             simulations = np.zeros((actual_length, 50))
             
             for i in range(50):
-                # GBM 수식: S(t) = S(0) * exp((mu - 0.5*sigma^2)*t + sigma*W(t))
                 rand_shocks = np.random.normal(0, 1, actual_length)
                 cum_shocks = np.cumsum(rand_shocks)
                 time_steps = np.arange(1, actual_length + 1)
@@ -146,22 +147,22 @@ if df_raw is not None:
                 
             # 시나리오 요약 계산 (평균적 예측, 상위 위험 예측, 하위 위험 예측)
             mean_path = np.mean(simulations, axis=1)
-            upper_path = np.percentile(simulations, 90, axis=1) # 상위 90% 시나리오 (폭등 시)
-            lower_path = np.percentile(simulations, 10, axis=1) # 하위 10% 시나리오 (폭락 시)
+            upper_path = np.percentile(simulations, 90, axis=1) 
+            lower_path = np.percentile(simulations, 10, axis=1) 
             
             # 데이터프레임 시각화 구성
             total_index = list(y_data.index) + list(future_dates)
             plot_df = pd.DataFrame(index=total_index)
-            plot_df['과거 실제 환율'] = pd.Series(y_data.values, index=y_data.index)
-            plot_df['2030 평균 추세 예측'] = pd.Series(mean_path, index=future_dates)
-            plot_df['최대 상승 시나리오 (위험 경계)'] = pd.Series(upper_path, index=future_dates)
-            plot_df['최대 하락 시나리오 (안정 경계)'] = pd.Series(lower_path, index=future_dates)
+            plot_df['과거 실제 환율 변화'] = pd.Series(y_data.values, index=y_data.index)
+            plot_df['2030 평균 추세 예측선'] = pd.Series(mean_path, index=future_dates)
+            plot_df['상한 변화 경계 (폭등 시나리오)'] = pd.Series(upper_path, index=future_dates)
+            plot_df['하한 변화 경계 (폭락 시나리오)'] = pd.Series(lower_path, index=future_dates)
             
-            st.subheader(f"📊 {selected_curr} 2030년 장기 확률적 변동 범위 시뮬레이션")
+            st.subheader(f"📊 {selected_curr} 2030년 장기 환율 변화 범위 시뮬레이션")
             st.line_chart(plot_df, color=["#1f77b4", "#ff7f0e", "#d62728", "#2ca02c"])
             
             # 통계 리포트 출력
-            st.header("📝 2030년 장기 트렌드 진단서")
+            st.header("📝 2030년 장기 변화 예측 진단서")
             
             future_mean_val = mean_path[-1]
             future_upper_val = upper_path[-1]
@@ -169,67 +170,67 @@ if df_raw is not None:
             
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("2030년 중간값 예측", f"{future_mean_val:,.2f} 원", f"{future_mean_val - current_val:+,.2f} 원")
+                st.metric("2030년 평균 변화 예측값", f"{future_mean_val:,.2f} 원", f"{future_mean_val - current_val:+,.2f} 원")
             with col2:
-                st.metric("최대 폭등 시나리오", f"{future_upper_val:,.2f} 원")
+                st.metric("상한 변화 예측 (최대 폭등)", f"{future_upper_val:,.2f} 원")
             with col3:
-                st.metric("최대 폭락 시나리오", f"{future_lower_val:,.2f} 원")
+                st.metric("하한 변화 예측 (최대 폭락)", f"{future_lower_val:,.2f} 원")
                 
             # 텍스트 분석 자동 도출
             annual_mu = mu * 250 * 100 # 연환산 성장률
             if annual_mu > 0:
-                st.success(f"📈 **장기 추세 진단:** 과거 데이터 분석 결과, {selected_curr}은(는) 연평균 약 **{annual_mu:.2f}%의 상승 동력**을 내포하고 있습니다. 통계적 중간값 기준으로 2030년 말 환율은 현재보다 상승한 **{future_mean_val:,.2f}원** 근처에서 형성될 확률이 높습니다.")
+                st.success(f"📈 **변화 추세 진단:** 과거 흐름 분석 결과, {selected_curr}은(는) 연평균 약 **{annual_mu:.2f}%의 상승 추동력**을 내포하고 있습니다. 통계적 중간 변화량 기준으로 2030년 환율은 현재보다 점진적으로 상승한 **{future_mean_val:,.2f}원** 구간을 향해 변화할 가능성이 높습니다.")
             else:
-                st.warning(f"📉 **장기 추세 진단:** 과거 데이터 분석 결과, {selected_curr}은(는) 연평균 약 **{abs(annual_mu):.2f}%의 하락 동력**을 내포하고 있습니다. 통계적 중간값 기준으로 2030년 말 환율은 현재보다 하락한 **{future_mean_val:,.2f}원** 근처에서 형성될 확률이 높습니다.")
+                st.warning(f"📉 **변화 추세 진단:** 과거 흐름 분석 결과, {selected_curr}은(는) 연평균 약 **{abs(annual_mu):.2f}%의 하락 추동력**을 내포하고 있습니다. 통계적 중간 변화량 기준으로 2030년 환율은 현재보다 점진적으로 하락한 **{future_mean_val:,.2f}원** 구간을 향해 변화할 가능성이 높습니다.")
                 
-            st.info(f"💡 **보고서용 통계 팁:** 환율이 한 점으로 예측되지 않고 붉은 선과 초록 선 사이의 거리가 뒤로 갈수록 부채꼴 모양으로 넓어지는 이유는, 시간이 흐를수록 미래의 **불확실성(리스크 프리미엄)**이 누적되는 외환 시장의 실제 통계적 속성을 완벽히 반영했기 때문입니다.")
+            st.info(f"💡 **탐구 분석 팁:** 예측 곡선의 상한선과 하한선이 미래로 갈수록 부채꼴 모양으로 넓어지는 이유는, 예측 시점이 멀어질수록 외환 시장 내부의 정치·경제적 불안정성과 무작위적인 **변화 리스크**가 기하급수적으로 누적되기 때문입니다.")
         else:
             st.error("데이터가 부족합니다.")
 
     # ==========================================
-    # PAGE 3 ~ 5: 국가별 상세 페이지
+    # PAGE 3 ~ 5: 국가별 상세 변화 분석
     # ==========================================
     elif page == "🇺🇸 미국 (원/달러)":
-        st.title("🇺🇸 미국 달러 (USD) 대원화 환율 심층 분석")
-        st.header("📈 환율 추세 및 이동평균선(MA) 분석")
+        st.title("🇺🇸 미국 달러 (USD) 환율의 역사적 변화 분석")
+        st.header("📈 환율 추세 변화 및 이동평균선(MA) 분석")
         df_usd = pd.DataFrame(index=df.index)
-        df_usd['실제 달러 환율'] = df['원/달러']
+        df_usd['실제 달러 환율 변화'] = df['원/달러']
         df_usd['20일 이평선'] = df['원/달러'].rolling(window=20).mean()
         df_usd['60일 이평선'] = df['원/달러'].rolling(window=60).mean()
         st.line_chart(df_usd, color=["#003f5c", "#2f4b7c", "#a0c4ff"])
         
-        st.header("📊 일일 변동률 분포 (Histogram)")
+        st.header("📊 일일 환율 변화 폭 분포 (Histogram)")
         counts, bin_edges = np.histogram(return_df_clean['원/달러'], bins=30)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        hist_usd = pd.DataFrame({'원/달러 변동 빈도': counts}, index=np.round(bin_centers, 2))
+        hist_usd = pd.DataFrame({'원/달러 변화 빈도': counts}, index=np.round(bin_centers, 2))
         st.bar_chart(hist_usd, color=["#1f77b4"])
 
     elif page == "🇯🇵 일본 (원/100엔)":
-        st.title("🇯🇵 일본 엔 (JPY 100) 대원화 환율 심층 분석")
-        st.header("📈 환율 추세 및 이동평균선(MA) 분석")
+        st.title("🇯🇵 일본 엔 (JPY 100) 환율의 역사적 변화 분석")
+        st.header("📈 환율 추세 변화 및 이동평균선(MA) 분석")
         df_jpy = pd.DataFrame(index=df.index)
-        df_jpy['실제 엔화 환율'] = df['원/100엔']
+        df_jpy['실제 엔화 환율 변화'] = df['원/100엔']
         df_jpy['20일 이평선'] = df['원/100엔'].rolling(window=20).mean()
         df_jpy['60일 이평선'] = df['원/100엔'].rolling(window=60).mean()
         st.line_chart(df_jpy, color=["#f95d6a", "#ff7c43", "#ffa600"])
         
-        st.header("📊 일일 변동률 분포 (Histogram)")
+        st.header("📊 일일 환율 변화 폭 분포 (Histogram)")
         counts, bin_edges = np.histogram(return_df_clean['원/100엔'], bins=30)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        hist_jpy = pd.DataFrame({'원/100엔 변동 빈도': counts}, index=np.round(bin_centers, 2))
+        hist_jpy = pd.DataFrame({'원/100엔 변화 빈도': counts}, index=np.round(bin_centers, 2))
         st.bar_chart(hist_jpy, color=["#ff7f0e"])
 
     elif page == "🇨🇳 중국 (원/위안)":
-        st.title("🇨🇳 중국 위안 (CNY) 대원화 환율 심층 분석")
-        st.header("📈 환율 추세 및 이동평균선(MA) 분석")
+        st.title("🇨🇳 중국 위안 (CNY) 환율의 역사적 변화 분석")
+        st.header("📈 환율 추세 변화 및 이동평균선(MA) 분석")
         df_cny = pd.DataFrame(index=df.index)
-        df_cny['실제 위안 환율'] = df['원/위안']
+        df_cny['실제 위안 환율 변화'] = df['원/위안']
         df_cny['20일 이평선'] = df['원/위안'].rolling(window=20).mean()
         df_cny['60일 이평선'] = df['원/위안'].rolling(window=60).mean()
         st.line_chart(df_cny, color=["#107c41", "#1f9e55", "#7bcd9b"])
         
-        st.header("📊 일일 변동률 분포 (Histogram)")
+        st.header("📊 일일 환율 변화 폭 분포 (Histogram)")
         counts, bin_edges = np.histogram(return_df_clean['원/위안'], bins=30)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        hist_cny = pd.DataFrame({'원/위안 변동 빈도': counts}, index=np.round(bin_centers, 2))
+        hist_cny = pd.DataFrame({'원/위안 변화 빈도': counts}, index=np.round(bin_centers, 2))
         st.bar_chart(hist_cny, color=["#2ca02c"])
